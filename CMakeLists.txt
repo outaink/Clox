@@ -8,4 +8,8 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 
 add_executable(Clox
     src/main.c
+    src/debug.c
+    src/chunk.c
+    src/memory.c
+    src/value.c
 )
