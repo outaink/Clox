@@ -12,4 +12,5 @@ add_executable(Clox
     src/chunk.c
     src/memory.c
     src/value.c
+    src/vm.c
 )
