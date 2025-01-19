@@ -13,4 +13,9 @@ add_executable(Clox
     src/memory.c
     src/value.c
     src/vm.c
+    src/scanner.c
+    src/compiler.c
 )
+
+add_test(NAME TestWithArgs
+        COMMAND clox testfiles/controlflow/ForLoopTest)
