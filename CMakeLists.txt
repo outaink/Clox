@@ -6,6 +6,8 @@ set(CMAKE_STANDARD_REQUIRED ON)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
+enable_testing()
+
 add_executable(Clox
     src/main.c
     src/debug.c
@@ -15,7 +17,8 @@ add_executable(Clox
     src/vm.c
     src/scanner.c
     src/compiler.c
+    src/object.c
 )
 
-add_test(NAME TestWithArgs
-        COMMAND clox testfiles/controlflow/ForLoopTest)
+add_test(NAME testExp
+        COMMAND Clox ${CMAKE_SOURCE_DIR}/tests/clox/exp.txt)
