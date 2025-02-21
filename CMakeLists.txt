@@ -18,6 +18,7 @@ add_executable(Clox
     src/scanner.c
     src/compiler.c
     src/object.c
+    src/table.c
 )
 
 add_test(NAME testExp
