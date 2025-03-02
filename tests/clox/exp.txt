@@ -1,2 +1,6 @@
-print 1 + 2;
-print 3 * 4;
+var global = 0;
+{
+    var local = 1;
+    global = local + 1;
+    print global;
+}

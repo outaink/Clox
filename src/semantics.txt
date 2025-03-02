@@ -3,3 +3,5 @@ statement      → exprStmt
 
 declaration    → varDecl
                | statement ;
+
+block          → "{" declaration* "}" ;
