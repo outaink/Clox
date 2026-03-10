@@ -39,6 +39,15 @@ typedef struct {
 
   // GC 链表：记录所有在堆上分配的对象，以便垃圾回收器追踪。
   Obj *objects;  
+
+  // GC 三色标记法
+  int grayCount;
+  int grayCapacity;
+  Obj** grayStack;
+
+  // GC 频率和空闲内容大小相关
+  size_t bytesAllocated;
+  size_t nextGC;
 } VM;
 
 typedef enum {
