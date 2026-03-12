@@ -1,0 +1,10 @@
+class Foo {
+  init() {
+    print "init";
+    return;
+    print "should not print";
+  }
+}
+
+var foo = Foo();
+print foo.init();

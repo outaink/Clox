@@ -1,0 +1,15 @@
+print "hi" or 2;
+print nil or "yes";
+print false or false or true;
+
+print "hi" and "yes";
+print nil and "yes";
+print false and true;
+
+print false or "fallback";
+print true and "proceed";
+
+var a = "first";
+var b = "second";
+print a or b;
+print a and b;

@@ -1,0 +1,17 @@
+fun returnString() {
+  return "hello";
+}
+
+fun returnEarly() {
+  print "before";
+  return "early";
+  print "after";
+}
+
+fun noReturn() {
+  print "no return";
+}
+
+print returnString();
+print returnEarly();
+print noReturn();

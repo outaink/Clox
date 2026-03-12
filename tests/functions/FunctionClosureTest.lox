@@ -1,0 +1,22 @@
+var f;
+
+fun foo() {
+  var a = "a";
+  fun f_() {
+    print a;
+  }
+  f = f_;
+}
+
+var x = "global";
+fun outer() {
+  var x = "outer";
+  fun inner() {
+    print x;
+  }
+  inner();
+}
+
+foo();
+f();
+outer();

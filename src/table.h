@@ -9,7 +9,6 @@ typedef struct {
     Value value;
 } Entry;
 
-
 typedef struct {
     int count;
     int capacity;

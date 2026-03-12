@@ -21,5 +21,5 @@ add_executable(Clox
     src/table.c
 )
 
-add_test(NAME testExp
-        COMMAND Clox ${CMAKE_SOURCE_DIR}/tests/clox/exp.txt)
+add_test(NAME runAllTests
+        COMMAND ${CMAKE_SOURCE_DIR}/tests/run_tests.sh)
