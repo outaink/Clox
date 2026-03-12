@@ -18,19 +18,28 @@ static Obj *allocateObject(size_t size, ObjType type) {
   vm.objects = object;
 
 #ifdef DEBUG_LOG_GC
-  printf("%p allocate %zu for %d\n", (void*)object, size, type);
+  printf("%p allocate %zu for %d\n", (void *)object, size, type);
 #endif
   return object;
 }
 
-ObjClass* newClass(ObjString* name) {
-  ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method) {
+  ObjBoundMethod *bound = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
+
+  bound->receiver = receiver;
+  bound->method = method;
+  return bound;
+}
+
+ObjClass *newClass(ObjString *name) {
+  ObjClass *klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
   klass->name = name;
+  initTable(&klass->methods);
   return klass;
 }
 
 ObjClosure *newClosure(ObjFunction *function) {
-  ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
+  ObjUpvalue **upvalues = ALLOCATE(ObjUpvalue *, function->upvalueCount);
   for (int i = 0; i < function->upvalueCount; i++) {
     upvalues[i] = NULL;
   }
@@ -51,8 +60,8 @@ ObjFunction *newFunction() {
   return function;
 }
 
-ObjInstance* newInstance(ObjClass* klass) {
-  ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+ObjInstance *newInstance(ObjClass *klass) {
+  ObjInstance *instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
   instance->klass = klass;
   initTable(&instance->fields);
   return instance;
@@ -73,7 +82,7 @@ static ObjString *allocateString(char *chars, int length, uint32_t hash) {
   push(OBJ_VAL(string));
   tableSet(&vm.strings, string, NIL_VAL);
   pop();
-  
+
   return string;
 }
 
@@ -126,6 +135,9 @@ static void printFunction(ObjFunction *function) {
 
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
+    case OBJ_BOUND_METHOD:
+      printFunction(AS_BOUND_METHOD(value)->method->function);
+      break;
     case OBJ_CLASS:
       printf("%s", AS_CLASS(value)->name->chars);
       break;

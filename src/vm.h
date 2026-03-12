@@ -34,6 +34,7 @@ typedef struct {
   Table globals; // 存储全局变量的哈希表
   Table strings; // 字符串驻留表，确保相同的字符串只存储一份
 
+  ObjString* initString;
   // Upvalue 链表：用于管理闭包捕获的、且仍在栈上的变量。
   ObjUpvalue* openUpvalues; 
 

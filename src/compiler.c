@@ -6,8 +6,8 @@
 
 #include "common.h"
 #include "compiler.h"
-#include "object.h"
 #include "memory.h"
+#include "object.h"
 #include "scanner.h"
 
 #ifdef DEBUG_PRINT_CODE
@@ -37,6 +37,8 @@ typedef enum {
 
 typedef void (*ParseFn)(bool canAssign);
 
+static void namedVariable(Token name, bool canAssign);
+
 typedef struct {
   ParseFn prefix;        // 前缀函数
   ParseFn infix;         // 中缀函数
@@ -56,6 +58,8 @@ typedef struct {
 
 typedef enum {
   TYPE_FUNCTION,
+  TYPE_INITIALIZER,
+  TYPE_METHOD,
   TYPE_SCRIPT,
 } FunctionType;
 
@@ -71,8 +75,13 @@ typedef struct Compiler {
   int scopeDepth; // 当前作用域深度
 } Compiler;
 
+typedef struct ClassCompiler {
+  struct ClassCompiler* enclosing;
+} ClassCompiler;
+
 Parser parser;
 Compiler *current = NULL;
+ClassCompiler* currentClass = NULL;
 Chunk *compilingChunk;
 
 static Chunk *currentChunk() { return &current->function->chunk; }
@@ -159,7 +168,12 @@ static int emitJump(uint8_t instruction) {
 }
 
 static void emitReturn() {
-  emitByte(OP_NIL);
+  if (current->type == TYPE_INITIALIZER) {
+    emitBytes(OP_GET_LOCAL, 0);
+  } else {
+    emitByte(OP_NIL);
+  }
+
   emitByte(OP_RETURN);
 }
 
@@ -205,8 +219,13 @@ static void initCompiler(Compiler *compiler, FunctionType type) {
   Local *local = &current->locals[current->localCount++];
   local->depth = 0;
   local->isCaptured = false;
-  local->name.start = "";
-  local->name.length = 0;
+  if (type != TYPE_FUNCTION) {
+    local->name.start = "this";
+    local->name.length = 4;
+  } else {
+    local->name.start = "";
+    local->name.length = 0;
+  }
 }
 
 static ObjFunction *endCompiler() {
@@ -233,12 +252,11 @@ static void endScope() {
   current->scopeDepth--;
 
   while (current->localCount > 0 &&
-         current->locals[current->localCount - 1].depth > 
-         current->scopeDepth) {
+         current->locals[current->localCount - 1].depth > current->scopeDepth) {
     if (current->locals[current->localCount - 1].isCaptured) {
       emitByte(OP_CLOSE_UPVALUE);
     } else {
-      emitByte(OP_POP);  
+      emitByte(OP_POP);
     }
     current->localCount--;
   }
@@ -344,6 +362,10 @@ static void dot(bool canAssign) {
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitBytes(OP_SET_PROPERTY, name);
+  } else if (match(TOKEN_LEFT_RAREN)) {
+    uint8_t argCount = argumentList();
+    emitBytes(OP_INVOKE, name);
+    emitByte(argCount);
   } else {
     emitBytes(OP_GET_PROPERTY, name);
   }
@@ -375,8 +397,6 @@ static void block() {
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
 
-
-
 static void function(FunctionType type) {
   Compiler compiler;
   initCompiler(&compiler, type);
@@ -407,16 +427,47 @@ static void function(FunctionType type) {
   }
 }
 
+static void method() {
+  consume(TOKEN_IDENTIFIER, "Expect method name.");
+
+  // constant = index of method name in the constant table
+  uint8_t constant = identifierConstant(&parser.previous);
+
+  FunctionType type = TYPE_METHOD;
+  if (parser.previous.length == 4 &&
+      memcmp(parser.previous.start, "init", 4) == 0) {
+    type = TYPE_INITIALIZER;
+  }
+
+  function(type);
+  emitBytes(OP_METHOD, constant);
+}
+
 static void classDeclaration() {
   consume(TOKEN_IDENTIFIER, "Expect class name.");
+  Token className = parser.previous;
   uint8_t nameConstant = identifierConstant(&parser.previous);
   declareVariable();
 
   emitBytes(OP_CLASS, nameConstant);
   defineVariable(nameConstant);
 
+  ClassCompiler classCompiler;
+  classCompiler.enclosing = currentClass;
+  currentClass = &classCompiler;
+
+  namedVariable(
+      className,
+      false); // 把一个 class name
+              // 作为变量放到栈上，如果后续有method就能通过这个变量访问对应的class
   consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+  // -------------------------------- 防止用户忘记写 } 的情况
+  while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+    method();
+  }
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+  emitByte(OP_POP); // pop class name from stack
+  currentClass = currentClass->enclosing;
 }
 
 static void funDeclaration() {
@@ -637,6 +688,10 @@ static void returnStatement() {
   if (match(TOKEN_SEMICOLON)) {
     emitReturn();
   } else {
+    if (current->type == TYPE_INITIALIZER) {
+      error("Can't return a value from an initializer.");
+    }
+
     expression();
     consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
     emitByte(OP_RETURN);
@@ -770,6 +825,15 @@ static void variable(bool canAssign) {
                 canAssign); // 被命名的变量，那应该就有不被命名的变量
 }
 
+static void this_(bool canAssign) {
+  if (currentClass == NULL) {
+    error("Can't use 'this' outside of a class.");
+    return;
+  }
+
+  variable(false);
+}
+
 static void unary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
 
@@ -824,7 +888,7 @@ ParseRule rules[] = {
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
-    [TOKEN_THIS] = {NULL, NULL, PREC_NONE},
+    [TOKEN_THIS] = {this_, NULL, PREC_NONE},
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
@@ -875,9 +939,9 @@ ObjFunction *compile(const char *source) {
 }
 
 void markCompilerRoots() {
-  Compiler* compiler = current;
+  Compiler *compiler = current;
   while (compiler != NULL) {
-    markObject((Obj*)compiler->function);
+    markObject((Obj *)compiler->function);
     compiler = compiler->enclosing;
   }
 }
